@@ -60,11 +60,8 @@ class SwitchBotController:
             self.scenes = {scene["sceneName"]: scene["sceneId"] for scene in resp_json.get("body", [])}
 
     async def turn_on_light_bulbs(
-            self,
-            session: ClientSession,
-            brightness: int = 100,
-            colour: str = "255:255:204"
-        ) -> None:
+        self, session: ClientSession, brightness: int = 100, colour: str = "255:255:204"
+    ) -> None:
         """Turn every lightbult listed in devices to maximum brightness yellow-white light.
 
         Parameters:
@@ -75,9 +72,9 @@ class SwitchBotController:
             if device["deviceType"] == "Color Bulb":
                 complete = False
                 commands = [
-                    ("setColor",colour),
-                    ("setBrightness",str(brightness)),
-                    ("turnOn","default"),
+                    ("setColor", colour),
+                    ("setBrightness", str(brightness)),
+                    ("turnOn", "default"),
                 ]
                 post_url = f"{self.base_url}v1.1/devices/{device['deviceId']}/commands"
                 get_url = f"{self.base_url}v1.1/devices/{device['deviceId']}/status"
@@ -91,7 +88,7 @@ class SwitchBotController:
                         }
                         tasks.append(session.post(post_url, headers=self.headers, json=payload))
                     await asyncio.gather(*tasks)
-                    await asyncio.sleep(5) # Rough timeout guess
+                    await asyncio.sleep(5)  # Rough timeout guess
                     async with session.get(get_url, headers=self.headers, json=payload) as resp:
                         status = await resp.text()
                         status = json.loads(status)["body"]
@@ -99,13 +96,13 @@ class SwitchBotController:
                     commands = []
                     if status["power"] != "on":
                         complete = False
-                        commands.append(("turnOn","default"))
+                        commands.append(("turnOn", "default"))
                     if status["brightness"] != 100:
                         complete = False
-                        commands.append(("setBrightness",str(brightness)))
+                        commands.append(("setBrightness", str(brightness)))
                     if status["color"] != "255:255:204":
                         complete = False
-                        commands.append(("setColor",colour))
+                        commands.append(("setColor", colour))
 
     async def open_curtains(self, session: ClientSession) -> None:
         """Open every Curtain3 device.
@@ -126,7 +123,7 @@ class SwitchBotController:
                         "commandType": "command",
                     }
                     await asyncio.gather(session.post(post_url, headers=self.headers, json=payload))
-                    await asyncio.sleep(60) # Curtain opens very slowly
+                    await asyncio.sleep(60)  # Curtain opens very slowly
                     async with session.get(get_url, headers=self.headers, json=payload) as resp:
                         status = await resp.text()
                         status = json.loads(status)
