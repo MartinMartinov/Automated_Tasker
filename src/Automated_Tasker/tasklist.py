@@ -114,8 +114,10 @@ class TaskRegistry:
                 # Tasks generated on build versus during build register as different types
                 if type(task) is type:
                     await task.execute(task, self.vault)
+                    logger.info(f"{task.NAME} executed.")
                     return
                 await task.execute(self.vault)
+                logger.info(f"{task.NAME} executed.")
 
 
 @functools.cache
