@@ -50,7 +50,7 @@ class GoogleCalendarClient:
                     creds = flow.run_local_server(port=0)
                 self.vault.store_entry("google-creds", creds.to_json())
 
-            self.service = build("calendar", "v3", credentials=creds)
+            self.service = build("calendar", "v3", credentials=creds, cache_discovery=False)
 
     def get_today_startstop(self) -> tuple[datetime, datetime]:
         """Get today's start and stop (in EST timezone), to query Google Calendar with.
