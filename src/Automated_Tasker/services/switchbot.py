@@ -6,6 +6,7 @@ import hashlib
 import hmac
 import base64
 import uuid
+import json
 
 from aiohttp import ClientSession
 
@@ -58,7 +59,12 @@ class SwitchBotController:
             resp_json = await response.json()
             self.scenes = {scene["sceneName"]: scene["sceneId"] for scene in resp_json.get("body", [])}
 
-    async def turn_on_light_bulbs(self, session: ClientSession) -> None:
+    async def turn_on_light_bulbs(
+            self,
+            session: ClientSession,
+            brightness: int = 100,
+            colour: str = "255:255:204"
+        ) -> None:
         """Turn every lightbult listed in devices to maximum brightness yellow-white light.
 
         Parameters:
@@ -67,27 +73,39 @@ class SwitchBotController:
         tasks = []
         for device in self.devices:
             if device["deviceType"] == "Color Bulb":
-                device_id = device["deviceId"]
-                url = f"{self.base_url}v1.1/devices/{device_id}/commands"
-                payload = {
-                    "command": "setColor",
-                    "parameter": "255:255:204",
-                    "commandType": "command",
-                }
-                tasks.append(session.post(url, headers=self.headers, json=payload))
-                payload = {
-                    "command": "setBrightness",
-                    "parameter": "100",
-                    "commandType": "command",
-                }
-                tasks.append(session.post(url, headers=self.headers, json=payload))
-                payload = {
-                    "command": "turnOn",
-                    "parameter": "default",
-                    "commandType": "command",
-                }
-                tasks.append(session.post(url, headers=self.headers, json=payload))
-        await asyncio.gather(*tasks)
+                complete = False
+                commands = [
+                    ("setColor",colour),
+                    ("setBrightness",str(brightness)),
+                    ("turnOn","default"),
+                ]
+                post_url = f"{self.base_url}v1.1/devices/{device['deviceId']}/commands"
+                get_url = f"{self.base_url}v1.1/devices/{device['deviceId']}/status"
+                while not complete:
+                    tasks = []
+                    for command, parameter in commands:
+                        payload = {
+                            "command": command,
+                            "parameter": parameter,
+                            "commandType": "command",
+                        }
+                        tasks.append(session.post(post_url, headers=self.headers, json=payload))
+                    await asyncio.gather(*tasks)
+                    await asyncio.sleep(5) # Rough timeout guess
+                    async with session.get(get_url, headers=self.headers, json=payload) as resp:
+                        status = await resp.text()
+                        status = json.loads(status)["body"]
+                    complete = True
+                    commands = []
+                    if status["power"] != "on":
+                        complete = False
+                        commands.append(("turnOn","default"))
+                    if status["brightness"] != 100:
+                        complete = False
+                        commands.append(("setBrightness",str(brightness)))
+                    if status["color"] != "255:255:204":
+                        complete = False
+                        commands.append(("setColor",colour))
 
     async def open_curtains(self, session: ClientSession) -> None:
         """Open every Curtain3 device.
@@ -95,19 +113,25 @@ class SwitchBotController:
         Parameters:
             session (ClientSession): An aiohttp session to be used for all the switchbot requests
         """
-        tasks = []
         for device in self.devices:
             if device["deviceType"] == "Curtain3":
-                device_id = device["deviceId"]
-                url = f"{self.base_url}v1.1/devices/{device_id}/commands"
-                payload = {
-                    "command": "setPosition",
-                    "parameter": "0",
-                    "mode": "1",
-                    "commandType": "command",
-                }
-                tasks.append(session.post(url, headers=self.headers, json=payload))
-        await asyncio.gather(*tasks)
+                complete = False
+                while not complete:
+                    post_url = f"{self.base_url}v1.1/devices/{device['deviceId']}/commands"
+                    get_url = f"{self.base_url}v1.1/devices/{device['deviceId']}/status"
+                    payload = {
+                        "command": "setPosition",
+                        "parameter": "0",
+                        "mode": "1",
+                        "commandType": "command",
+                    }
+                    await asyncio.gather(session.post(post_url, headers=self.headers, json=payload))
+                    await asyncio.sleep(60) # Curtain opens very slowly
+                    async with session.get(get_url, headers=self.headers, json=payload) as resp:
+                        status = await resp.text()
+                        status = json.loads(status)
+                    if int(status["body"]["slidePosition"]) < 20:
+                        complete = True
 
     async def activate_scene(self, session: ClientSession, sceneId: str) -> None:
         """Active the specific scene.
