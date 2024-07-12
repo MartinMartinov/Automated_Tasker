@@ -59,7 +59,6 @@ class SwitchBotController:
             resp_json = await response.json()
             self.scenes = {scene["sceneName"]: scene["sceneId"] for scene in resp_json.get("body", [])}
 
-
     async def turn_on_light_bulb(
         self, session: ClientSession, devid: str, brightness: int = 100, colour: str = "255:255:204"
     ) -> None:
@@ -91,6 +90,8 @@ class SwitchBotController:
             await asyncio.gather(*tasks)
             await asyncio.sleep(5)  # Rough timeout guess
             async with session.get(get_url, headers=self.headers, json=payload) as resp:
+                if not resp.ok:
+                    continue
                 status = await resp.text()
                 status = json.loads(status)["body"]
             complete = True
@@ -118,7 +119,7 @@ class SwitchBotController:
         tasks = []
         for device in self.devices:
             if device["deviceType"] == "Color Bulb":
-                tasks.append(self.turn_on_light_bulb(session, device['deviceId'], brightness, colour))
+                tasks.append(self.turn_on_light_bulb(session, device["deviceId"], brightness, colour))
         await asyncio.gather(*tasks)
 
     async def open_curtain(self, session: ClientSession, devid: str) -> None:
@@ -134,15 +135,21 @@ class SwitchBotController:
         while not complete:
             payload = {
                 "command": "setPosition",
-                "parameter": "0",
+                "parameter": "0,1,0",
                 "mode": "1",
                 "commandType": "command",
             }
-            await asyncio.gather(session.post(post_url, headers=self.headers, json=payload))
-            await asyncio.sleep(60)  # Curtain opens very slowly
-            async with session.get(get_url, headers=self.headers, json=payload) as resp:
-                status = await resp.text()
-                status = json.loads(status)["body"]
+            resp = await asyncio.gather(session.post(post_url, headers=self.headers, json=payload))
+            await asyncio.sleep(5)  # Rough timeout guess
+            moving = True
+            while moving:
+                await asyncio.sleep(30)  # Curtain moves real slow
+                async with session.get(get_url, headers=self.headers, json=payload) as resp:
+                    status = await resp.text()
+                    status = json.loads(status)["body"]
+                if status["moving"] != 100: # I think 0 is fastest and 100 is slowest, API says this should be a bool
+                    moving = False
+
             if int(status["slidePosition"]) < 20:
                 complete = True
 
@@ -155,7 +162,7 @@ class SwitchBotController:
         tasks = []
         for device in self.devices:
             if device["deviceType"] == "Curtain3":
-                tasks.append(self.open_curtain(session, device['deviceId']))
+                tasks.append(self.open_curtain(session, device["deviceId"]))
         await asyncio.gather(*tasks)
 
     async def activate_scene(self, session: ClientSession, sceneId: str) -> None:
