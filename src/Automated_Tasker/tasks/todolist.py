@@ -38,10 +38,3 @@ class ToDoList:
             for event in events:
                 update = update + f"\n{event['start']['dateTime'][11:19]} - {event['summary']}"
             notifier.send_notification("Today's Events", update)
-
-        tasks = list(calendar.get_todays_tasks())
-        if tasks:
-            update = "Tasks - "
-            for task in tasks:
-                update = update + f"\n{task}"
-            notifier.send_notification("Today's Tasks", update)

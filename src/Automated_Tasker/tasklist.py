@@ -42,7 +42,7 @@ class TaskRegistry:
         self._package_name = package
         self.global_tasklist: Deque[Any] = collections.deque()
         self.current_tasklist: Deque[Any] = collections.deque()
-        self.vault = Vault(getpass("Enter vault password: "))
+        self.vault = Vault(getpass("Vault password: "))
 
     def load(self) -> None:
         """Invoke the _load_package() function on _package_name (if initiliazed)."""
@@ -83,7 +83,7 @@ class TaskRegistry:
                 continue
             if task.DAYS and weekday not in task.DAYS:
                 continue
-            self.current_tasklist.append(task)
+            self.add_daily_tasklist(task)
             tasks.append(task.NAME)
         logger.info(f"Added {', '.join(tasks)} to daily tasklist.")
 
@@ -95,7 +95,7 @@ class TaskRegistry:
         """
         i = 0
         for i, set_task in enumerate(self.current_tasklist):
-            if task.TIME < set_task.timedelta:
+            if task.TIME < set_task.TIME:
                 break
         self.current_tasklist.insert(i, task)
 
@@ -111,7 +111,7 @@ class TaskRegistry:
             if self.current_tasklist[0].TIME < current_time:
                 task = self.current_tasklist.popleft()
                 logger.info(f"Executing {task.NAME}.")
-                # Tasks generated on build versus during build register as different types
+                # Tasks generated on build versus during execution register as different types
                 if type(task) is type:
                     await task.execute(task, self.vault)
                     logger.info(f"{task.NAME} executed.")

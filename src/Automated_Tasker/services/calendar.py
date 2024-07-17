@@ -81,7 +81,6 @@ class GoogleCalendarClient:
             Iterator[str]: The events returned by Google Calendar in chronological sequence
         """
         start, stop = self.get_today_startstop()
-
         try:
             events_result = (
                 self.service.events()
@@ -98,43 +97,7 @@ class GoogleCalendarClient:
             return None
 
         events = events_result.get("items", [])
-        if not events:
-            return None
-
-        # Redundent?
-        events.sort(key=lambda x: x["start"].get("dateTime", x["start"].get("date")))
-        yield from events
-
-    def get_todays_tasks(self) -> Iterator[dict[Any]]:
-        """Get today's Google Calendar tasks.
-
-        Yields:
-            Iterator[str]: The tasks returned by Google Calendar in chronological sequence
-        """
-        start, stop = self.get_today_startstop()
-
-        try:
-            tasks_result = (
-                self.service.events()
-                .list(
-                    calendarId="primary",
-                    timeMin=start,
-                    timeMax=stop,
-                    singleEvents=True,
-                    orderBy="startTime",
-                    q="eventType:tasks",
-                )
-                .execute()
-            )
-
-        except HttpError:
-            return None
-
-        tasks = tasks_result.get("items", [])
-
-        if not tasks:
-            return None
-
-        # Sort tasks by start time
-        tasks.sort(key=lambda x: x["start"].get("dateTime", x["start"].get("date")))
-        yield from tasks
+        
+        for event in events:
+            if 'dateTime' in event['start']:
+                yield event
