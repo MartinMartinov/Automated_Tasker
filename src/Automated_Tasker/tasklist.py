@@ -83,7 +83,7 @@ class TaskRegistry:
                 continue
             if task.DAYS and weekday not in task.DAYS:
                 continue
-            self.add_daily_tasklist(task)
+            self.add_daily_tasklist(task())
             tasks.append(task.NAME)
         logger.info(f"Added {', '.join(tasks)} to daily tasklist.")
 
@@ -111,11 +111,6 @@ class TaskRegistry:
             if self.current_tasklist[0].TIME < current_time:
                 task = self.current_tasklist.popleft()
                 logger.info(f"Executing {task.NAME}.")
-                # Tasks generated on build versus during execution register as different types
-                if type(task) is type:
-                    await task.execute(task, self.vault)
-                    logger.info(f"{task.NAME} executed.")
-                    return
                 await task.execute(self.vault)
                 logger.info(f"{task.NAME} executed.")
 
