@@ -54,12 +54,15 @@ class SetAlarm:
                         """
                         tokens = vault.load_entries()
                         controller = SwitchBotController(tokens["switchbot-token"], tokens["switchbot-secret"])
-                        tasks = []
+                        #tasks = []
                         async with ClientSession() as session:
-                            await controller.fetch_devices(session)
-                            tasks.append(controller.open_curtains(session))
-                            tasks.append(controller.turn_on_light_bulbs(session))
-                            await asyncio.gather(*tasks)
+                            #await controller.fetch_devices(session)
+                            #tasks.append(controller.open_curtains(session))
+                            #tasks.append(controller.turn_on_light_bulbs(session))
+                            #tasks.append(controller.turn_on_plug_alarms(session))
+                            await controller.fetch_scenes(session)
+                            await controller.activate_scene(session, controller.lookup_scene("Alarm Start"))
+                            #await asyncio.gather(*tasks)
 
                 alarm = Alarm()
                 Tasks.add_daily_tasklist(Alarm())

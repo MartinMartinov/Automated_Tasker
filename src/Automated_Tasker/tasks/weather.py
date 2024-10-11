@@ -31,7 +31,7 @@ class Weather:
             vault (Vault | None): The vault with the pushbullet token
         """
         notifier = PushbulletNotifier(vault.load_entries()["pushbullet-key"])
-        url = "https://weather.gc.ca/city/pages/on-118_metric_e.html"
+        url = "https://weather.gc.ca/en/location/index.html?coords=45.403,-75.687"
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
             "Accept-Language": "en-US,en;q=0.9",

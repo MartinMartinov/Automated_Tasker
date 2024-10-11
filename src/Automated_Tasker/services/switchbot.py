@@ -58,6 +58,19 @@ class SwitchBotController:
         async with session.get(url, headers=self.headers) as response:
             resp_json = await response.json()
             self.scenes = {scene["sceneName"]: scene["sceneId"] for scene in resp_json.get("body", [])}
+    
+    def lookup_scene(self, name: str) -> str:
+        """Get scene ID from scene name
+
+        Parameters:
+            name (str): The name of the scene
+
+        Returns:
+            str: The ID corresponding to the name
+        """
+        if name in self.scenes:
+            return self.scenes[name]
+        return "N/A"
 
     async def turn_on_light_bulb(
         self, session: ClientSession, devid: str, brightness: int = 100, colour: str = "255:255:204"
@@ -129,10 +142,9 @@ class SwitchBotController:
             session (ClientSession): An aiohttp session to be used for all the switchbot requests
             devid (str): The device ID
         """
-        complete = False
         post_url = f"{self.base_url}v1.1/devices/{devid}/commands"
         get_url = f"{self.base_url}v1.1/devices/{devid}/status"
-        while not complete:
+        while True:
             payload = {
                 "command": "setPosition",
                 "parameter": "0,1,0",
@@ -151,7 +163,7 @@ class SwitchBotController:
                     moving = False
 
             if int(status["slidePosition"]) < 20:
-                complete = True
+                break
 
     async def open_curtains(self, session: ClientSession) -> None:
         """Open every Curtain3 device in devices asynchronously.
@@ -165,6 +177,40 @@ class SwitchBotController:
                 tasks.append(self.open_curtain(session, device["deviceId"]))
         await asyncio.gather(*tasks)
 
+    async def turn_on_plug_alarm(self, session: ClientSession, devid: str) -> None:
+        """Turn on a specific alarm Plug Mini.
+
+        Parameters:
+            session (ClientSession): An aiohttp session to be used for all the switchbot requests
+            devid (str): The device ID
+        """
+        post_url = f"{self.base_url}v1.1/devices/{devid}/commands"
+        get_url = f"{self.base_url}v1.1/devices/{devid}/status"
+        while True:
+            payload = {
+                "command": "turnOn",
+                "commandType": "command",
+            }
+            resp = await asyncio.gather(session.post(post_url, headers=self.headers, json=payload))
+            await asyncio.sleep(5)  # Rough timeout guess
+            async with session.get(get_url, headers=self.headers, json=payload) as resp:
+                status = await resp.text()
+                status = json.loads(status)["body"]
+                if status["power"] == "on":
+                    break
+
+    async def turn_on_plug_alarms(self, session: ClientSession) -> None:
+        """Turn on every Plug Mini whose name starts with Alarm in devices asynchronously.
+
+        Parameters:
+            session (ClientSession): An aiohttp session to be used for all the switchbot requests
+        """
+        tasks = []
+        for device in self.devices:
+            if device["deviceName"].startswith("Alarm") and device["deviceType"] == "Plug Mini (US)":
+                tasks.append(self.turn_on_plug_alarm(session, device["deviceId"]))
+        await asyncio.gather(*tasks)
+
     async def activate_scene(self, session: ClientSession, sceneId: str) -> None:
         """Active the specific scene.
 
@@ -173,5 +219,9 @@ class SwitchBotController:
             sceneId (str): The sceneId pulled from the scenes dict to execute
         """
         url = f"{self.base_url}v1.1/scenes/{sceneId}/execute"
-        async with session.get(url, headers=self.headers) as response:
-            await response.json()
+        while True:
+            async with session.post(url, headers=self.headers) as response:
+                resp = await response.json()
+            if 'message' not in resp or resp['message'] != 'success':
+                continue
+            break

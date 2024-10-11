@@ -7,6 +7,7 @@ from datetime import timedelta, datetime
 import collections
 import pkgutil
 from Automated_Tasker.utils.vault import Vault
+from Automated_Tasker.services.pushbullet import PushbulletNotifier
 from pytz import timezone
 from getpass import getpass
 
@@ -111,9 +112,13 @@ class TaskRegistry:
             if self.current_tasklist[0].TIME < current_time:
                 task = self.current_tasklist.popleft()
                 logger.info(f"Executing {task.NAME}.")
-                await task.execute(self.vault)
-                logger.info(f"{task.NAME} executed.")
-
+                try:
+                    await task.execute(self.vault)
+                    logger.info(f"{task.NAME} executed.")
+                except Exception as e:
+                    notifier = PushbulletNotifier(self.vault.load_entries()["pushbullet-key"])
+                    notifier.send_notification(f"Task {task.NAME} failed to execute.", repr(e))
+                    logger.info(f"{task.NAME} failed to execute, notified.")
 
 @functools.cache
 def _load_package(package: str) -> None:
