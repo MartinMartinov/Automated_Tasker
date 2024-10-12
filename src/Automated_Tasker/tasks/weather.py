@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from Automated_Tasker.tasklist import Tasks, FIRST_THING_HOURS, FIRST_THING_MINUTES
+from Automated_Tasker.tasklist import Tasks, DAY_START
 from Automated_Tasker.utils.vault import Vault
 from Automated_Tasker.services.pushbullet import PushbulletNotifier
 
@@ -20,7 +20,7 @@ class Weather:
     """A task for pushing the GoC weather report through PushBullet."""
 
     NAME: str = "Weather"
-    TIME: timedelta = timedelta(hours=FIRST_THING_HOURS, minutes=FIRST_THING_MINUTES)
+    TIME: timedelta = timedelta(hours=DAY_START[0], minutes=DAY_START[1])
     DAYS: List[str] = []
     DAY: int = 0
 

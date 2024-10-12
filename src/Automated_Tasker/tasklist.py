@@ -15,9 +15,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-FIRST_THING_HOURS = 6
-FIRST_THING_MINUTES = 30
-
+SET_ALARM = (4, 30) # Hours, Minutes to set Alarm to
+DAY_START = (6, 30) # Hours, Minutes to notify in the morning
 
 class _Task(Protocol):
     """The minimum tempalte for all the tasks registered by the tasklist."""

@@ -8,9 +8,7 @@ from Automated_Tasker.services.switchbot import SwitchBotController
 from datetime import timedelta
 from aiohttp import ClientSession
 
-import asyncio
 from typing import List
-from datetime import datetime
 
 import logging
 

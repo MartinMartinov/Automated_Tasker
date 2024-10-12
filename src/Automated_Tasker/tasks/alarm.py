@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from Automated_Tasker.tasklist import Tasks
+from Automated_Tasker.tasklist import Tasks, SET_ALARM
 from Automated_Tasker.utils.vault import Vault
 from Automated_Tasker.services.calendar import GoogleCalendarClient
 from Automated_Tasker.services.switchbot import SwitchBotController
@@ -8,7 +8,6 @@ from Automated_Tasker.services.switchbot import SwitchBotController
 from datetime import timedelta
 from aiohttp import ClientSession
 
-import asyncio
 from typing import List
 from datetime import datetime
 
@@ -21,7 +20,7 @@ class SetAlarm:
     """A task for creating an Alarm task based on Google Calendar entries for the day."""
 
     NAME: str = "SetAlarm"
-    TIME: timedelta = timedelta(hours=4)
+    TIME: timedelta = timedelta(hours=SET_ALARM[0], minutes=SET_ALARM[1])
     DAYS: List[str] = []
     DAY: int = 0
 
