@@ -97,6 +97,8 @@ class TaskRegistry:
         for i, set_task in enumerate(self.current_tasklist):
             if task.TIME < set_task.TIME:
                 break
+        else:
+            i += 1
         self.current_tasklist.insert(i, task)
 
     async def execute_daily_tasks(self) -> None:
