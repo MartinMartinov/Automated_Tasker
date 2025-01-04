@@ -175,7 +175,7 @@ async def get_lane_swims(
     headers = [
         "Pool",
         "Table",
-        "Lane Swim Time",
+        "Time",
     ]
     rows = []
     for entry in entries:
