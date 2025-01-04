@@ -9,6 +9,7 @@ from typing import Literal, AsyncIterator
 from functools import cache
 from Automated_Tasker.tasklist import WEEKDAYS
 from tabulate import tabulate
+from time import struct_time, strptime
 
 listings_url = 'https://ottawa.ca/en/recreation-and-parks/facilities/place-listing?place_facets%5B0%5D=place_type%3A4285&place_facets%5B1%5D=place_type%3A2235821'
 facility_url = 'https://ottawa.ca/en/recreation-and-parks/facilities/place-listing/'
@@ -96,11 +97,36 @@ async def get_times(
                     else:
                         continue
     return(slots)
+
+async def convert_time(time_stamp: str) -> struct_time:
+    time_stamp = time_stamp.strip().lower().encode('ascii', 'ignore').decode()
     
+    if ':' in time_stamp:
+        if 'am' in time_stamp or 'pm' in time_stamp:
+            return strptime(time_stamp, "%I:%M %p")
+        return strptime(time_stamp, "%H:%M")
+    if 'am' in time_stamp or 'pm' in time_stamp:
+        return strptime(time_stamp, "%I %p")
+    return strptime(time_stamp, "%H")
+
+async def convert_time_ranges(time_range: str) -> AsyncIterator[tuple[struct_time,struct_time]]:
+    for period in time_range.replace('–','-').replace("noon","12:00 pm").split(","):
+        if "pm" in period and not " pm" in period:
+            period = period.replace("pm", " pm")
+        if "am" in period and not " am" in period:
+            period = period.replace("am", " am")
+
+        times = period.split('-')
+        times[0], times[1] = times[0].strip(), times[1].strip()
+        if times[1].endswith('m') and not times[0].endswith('m'):
+            times[0] = times[0] + ' ' + times[1][-2:]
+        yield await convert_time(times[0]), await convert_time(times[1]) 
 
 async def get_lane_swims(
         day: Literal["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
         location: str,
+        start: struct_time = strptime("00:00", "%H:%M"),
+        stop: struct_time = strptime("23:59", "%H:%M"),
     ) -> AsyncIterator[str]:
     geolocator = Nominatim(user_agent="pools_locator")
     lat, long = get_position(geolocator, location)
@@ -117,19 +143,15 @@ async def get_lane_swims(
             time['address'].split(',')[0],
             time['time'],
         ])
-    entries = sorted(entries, key=lambda x: x[2])
+    entries = sorted(entries, key=lambda x: x[2], reverse=True)
 
     # Pool Locations
     headers = [
         "Pool",
-        "Distance (km)",
+        "Dist. (km)",
         "Address",
     ]
-    rows = [[
-        "Starting Point",
-        0,
-        location,
-    ]]
+    rows = []
     for entry in entries:
         pool = [
             entry[0],
@@ -138,7 +160,11 @@ async def get_lane_swims(
         ]
         if pool not in rows:
             rows.append(pool)
-
+    rows.append([
+        "Starting Point",
+        0,
+        location.split(',')[0],
+    ])
     yield tabulate(
             rows,
             headers=headers,
@@ -152,21 +178,26 @@ async def get_lane_swims(
         "Lane Swim Time",
     ]
     rows = []
-    for n, entry in enumerate(entries):
-        name = entry[0]
-        if rows and rows[-1][0] == name:
-            name = ""
-        rows.append([
-            name,
-            entry[1],
-            entry[4],
-        ])
-        if n != 0 and (n % 20) == 0:
-            yield tabulate(
-                rows,
-                headers=headers,
-            )
-            rows = []
+    for entry in entries:
+        async for time in convert_time_ranges(entry[4]):
+            name = entry[0]
+            if rows and rows[-1][0] == name:
+                name = ""
+            table = entry[1]
+            if name == "" and rows and rows[-1][1] == table:
+                table = ""
+            if stop > time[0] and start < time[1]:
+                rows.append([
+                    name,
+                    table,
+                    f"{time[0].tm_hour:02d}:{time[0].tm_min:02d}-{time[1].tm_hour:02d}:{time[1].tm_min:02d}",
+                ])
+            if len(rows) == 25:
+                yield tabulate(
+                    rows,
+                    headers=headers,
+                )
+                rows = []
     if rows:
         yield tabulate(
             rows,
