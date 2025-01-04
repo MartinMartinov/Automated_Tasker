@@ -14,7 +14,8 @@ from aiohttp import ClientSession
 class SwitchBotController:
     """A class for performing necessary switchbot operations.
 
-    Requires the SwitchBot token and secret under the vault entry tag 'switchbot-token' and 'switchbot-secret'"""
+    Requires the SwitchBot token and secret under the vault entry tag 'switchbot-token' and 'switchbot-secret'
+    """
 
     def __init__(self, token: str, secret: str):
         nonce = uuid.uuid4()

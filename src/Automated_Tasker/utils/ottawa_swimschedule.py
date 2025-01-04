@@ -15,17 +15,29 @@ listings_url = 'https://ottawa.ca/en/recreation-and-parks/facilities/place-listi
 facility_url = 'https://ottawa.ca/en/recreation-and-parks/facilities/place-listing/'
 
 @cache
-def get_position(geolocator: Nominatim, address:str) -> tuple[str,str|int]:
+def get_position(geolocator: Nominatim, address:str) -> tuple[str|None,str|None]:
+    """Get the position of the address
+
+    Args:
+        geolocator: The geolocator used to find the latitude and longitude
+        address: The address to look up in the Nominatim lookup
+
+    Returns:
+        The latitude and longitude tuple, or double None if it failed
+    """
     geocoded_location = geolocator.geocode(address)
     if not geocoded_location:
         return None, None
     return geocoded_location.latitude, geocoded_location.longitude
 
 async def get_pools(geolocator: Nominatim) -> list[dict[str,str]]:
-    """A very slightly async function to slowly parse out the listings of all pools in Ottawa
+    """Get all the pools listed on the City of Ottawa page
+
+    Args:
+        geolocator: The geolocator used to find the latitude and longitude
 
     Returns:
-
+        A dict containing all the fields related to a pool that could be useful
     """
     pools = []
     for i in range(100):
@@ -55,6 +67,15 @@ async def get_times(
     pools: list[dict[str,str]],
     day: Literal["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
 ) -> list[dict[str,str|int]]:
+    """Find the tables for lane swims for a pool and extract the values on a weekday
+
+    Args:
+        pools: A list of all the dicts returned in the get_pools function
+        day: Day of the week to extract the column from (assumes the order given in the Literal)
+
+    Returns:
+        Returns all the tables in all the given pool webpages that include a Lane Swim
+    """
     slots = []
     for pool in pools:
         name = pool['name']
@@ -99,6 +120,14 @@ async def get_times(
     return(slots)
 
 async def convert_time(time_stamp: str) -> struct_time:
+    """Convert the plethora of Ottawa webpage formats to a time
+
+    Args:
+        time_stamp: A string containing a single time of day
+
+    Returns:
+        A time struct of the value to be used for filtering and cleaner printing
+    """
     time_stamp = time_stamp.strip().lower().encode('ascii', 'ignore').decode()
     
     if ':' in time_stamp:
@@ -110,6 +139,14 @@ async def convert_time(time_stamp: str) -> struct_time:
     return strptime(time_stamp, "%H")
 
 async def convert_time_ranges(time_range: str) -> AsyncIterator[tuple[struct_time,struct_time]]:
+    """_summary_
+
+    Args:
+        time_range: A string containing the values in the Ottawa website tables
+
+    Yields:
+        A tuple of start and stop time structs
+    """
     for period in time_range.replace('–','-').replace("noon","12:00 pm").split(","):
         if "pm" in period and not " pm" in period:
             period = period.replace("pm", " pm")
@@ -128,6 +165,19 @@ async def get_lane_swims(
         start: struct_time = strptime("00:00", "%H:%M"),
         stop: struct_time = strptime("23:59", "%H:%M"),
     ) -> AsyncIterator[str]:
+    """Create and return a series of tables to be used to display the data.
+    
+    Weird to make it an Iterator but here we are.
+
+    Args:
+        day: Day of the week
+        location: The starting point from which to calculate pool distances from
+        start: Start time if you don't want 12:00 AM
+        stop: Stop time if you don't want 11:59 PM
+
+    Yields:
+        First, a pool location table.  Then a series of tables describing the pool times.
+    """
     geolocator = Nominatim(user_agent="pools_locator")
     lat, long = get_position(geolocator, location)
     pools = await get_pools(geolocator)
@@ -180,16 +230,10 @@ async def get_lane_swims(
     rows = []
     for entry in entries:
         async for time in convert_time_ranges(entry[4]):
-            name = entry[0]
-            if rows and rows[-1][0] == name:
-                name = ""
-            table = entry[1]
-            if name == "" and rows and rows[-1][1] == table:
-                table = ""
             if stop > time[0] and start < time[1]:
                 rows.append([
-                    name,
-                    table,
+                    entry[0],
+                    entry[1],
                     f"{time[0].tm_hour:02d}:{time[0].tm_min:02d}-{time[1].tm_hour:02d}:{time[1].tm_min:02d}",
                 ])
             if len(rows) == 25:

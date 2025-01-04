@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 SET_ALARM = (4, 30) # Hours, Minutes to set Alarm to
 DAY_START = (6, 30) # Hours, Minutes to notify in the morning
+WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
 class _Task(Protocol):
     """The minimum tempalte for all the tasks registered by the tasklist."""
@@ -35,7 +36,6 @@ class TaskRegistry:
     Also creates a daily tasklist to execute throughout the day."""
 
     _TaskT = TypeVar("_TaskT", bound=_Task)
-    WEEKDAYS: Final = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
     def __init__(self, package: str | None = None):
         self.loaded = False
@@ -76,7 +76,7 @@ class TaskRegistry:
         """
         self.current_tasklist = collections.deque()
         today = datetime.today().astimezone(timezone("EST"))
-        weekday = TaskRegistry.WEEKDAYS[today.weekday()]
+        weekday = WEEKDAYS[today.weekday()]
         tasks = []
         for task in self.global_tasklist:
             if task.DAY != 0 and task.DAY is not today.day:
