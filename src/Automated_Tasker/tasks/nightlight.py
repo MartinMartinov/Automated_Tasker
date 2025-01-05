@@ -15,8 +15,8 @@ import logging
 logger = logging.getLogger(__name__)
 
 @Tasks.register
-class SetAlarm:
-    """A task for creating an Alarm task based on Google Calendar entries for the day."""
+class StartNightLight:
+    """A task for turning on the night scene set in switchbot."""
 
     NAME: str = "NightLight"
     TIME: timedelta = timedelta(hours=23)
