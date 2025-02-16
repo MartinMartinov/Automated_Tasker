@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 @Tasks.register
 class SetAlarm:
-    """A task for creating an Alarm task based on Google Calendar entries for the day."""
+    """A task for checking traffic."""
 
     NAME: str = "SetAlarm"
     TIME: timedelta = timedelta(hours=SET_ALARM[0], minutes=SET_ALARM[1])
