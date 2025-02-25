@@ -45,7 +45,7 @@ class SetTrafficAlerts:
         """Get all of today's events from Google Calendar to warn of changes to travel time.
 
         Parameters:
-            vault (Vault | None): The vault with the pushbullet token and Google Calendar creds
+            vault: The vault with the pushbullet token and Google Calendar creds
         """
         calendar = GoogleCalendarClient(vault)
         maps = GoogleMapsClient(vault)
@@ -68,11 +68,12 @@ class SetTrafficAlerts:
                     seconds = timeparse((await maps.get_distance(**api_dict))['duration'])
                     break
                 except:
-                    await asyncio.sleep(5)
+                    await asyncio.sleep(60) # In no rush to schedule this
                 seconds = timeparse((await maps.get_distance(**api_dict))['duration'])
 
             name = event['summary']
 
+            fallback_time = convert_timedelta(arrival_time-(timedelta(seconds=seconds)))
             recheck_time = convert_timedelta(arrival_time-(2*timedelta(seconds=seconds)))
             class TrafficAlert:
                 """An etheral task created for checking travel time before going somewhere."""
@@ -82,31 +83,40 @@ class SetTrafficAlerts:
                 DAYS: List[str] = []
                 DAY: int = 0
 
-                def __init__(self, name: str, api_dict: dict[str, Any], arrival_time: datetime):
+                def __init__(
+                        self,
+                        name: str,
+                        api_dict: dict[str, Any],
+                        fallback_time: datetime,
+                        arrival_time: datetime
+                    ):
                     self.name = name
                     self.api_dict = api_dict
                     self.arrival_time = arrival_time
+                    self.fallback_time = fallback_time
 
                 async def execute(self, _: Vault | None = None):
-                    """Start all the SwitchBot alarm devices.
-
-                    
-                    Parameters:
-                        vault (Vault | None): The vault
-                    """
+                    """Start all the SwitchBot alarm devices."""
+                    seconds = None
                     for _ in range(5): # Try five times while catching exceptions
                         try:
                             seconds = timeparse((await maps.get_distance(**self.api_dict))['duration'])
                             break
                         except:
                             await asyncio.sleep(5)
-                        seconds = timeparse((await maps.get_distance(**self.api_dict))['duration'])
-                    departure_time = convert_timedelta(self.arrival_time-timedelta(seconds=seconds))
 
+                    if seconds:
+                        departure_time = convert_timedelta(self.arrival_time-timedelta(seconds=seconds))
+                        notifier.send_notification(
+                            f"ETA for {self.name}",
+                            f"Leave at {departure_time} to get there for {convert_timedelta(self.arrival_time)}",
+                        )
+                        return
                     notifier.send_notification(
-                        f"ETA for {self.name}",
-                        f"Leave at {departure_time} to get there for {convert_timedelta(self.arrival_time)}",
+                        f"Fallback ETA for {self.name}",
+                        f"Leave at {self.fallback_time} to get there for {convert_timedelta(self.arrival_time)}",
                     )
+                    
 
-            Tasks.add_daily_tasklist(TrafficAlert(name, api_dict, arrival_time))
+            Tasks.add_daily_tasklist(TrafficAlert(name, api_dict, arrival_time, fallback_time))
             logger.info(f"Added TrafficAlert at ({recheck_time}) to daily tasklist.")

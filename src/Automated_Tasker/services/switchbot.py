@@ -48,6 +48,23 @@ class SwitchBotController:
         async with session.get(url, headers=self.headers) as response:
             resp_json = await response.json()
             self.devices = resp_json.get("body", {}).get("deviceList", [])
+    
+    def lookup_device(self, name: str) -> str:
+        """Get device ID from device name
+
+        Parameters:
+            name (str): The name of the device
+
+        Returns:
+            str: The ID corresponding to the name
+
+        Raises:
+            KeyError: When the entry can't be found
+        """
+        for device in self.devices:
+            if name == device['deviceName']:
+                return device['deviceId']
+        raise KeyError
 
     async def fetch_scenes(self, session: ClientSession) -> None:
         """Fetch the list of scenes and store them in the scenes dict, mapping sceneName to sceneId.
@@ -68,10 +85,13 @@ class SwitchBotController:
 
         Returns:
             str: The ID corresponding to the name
+        
+        Raises:
+            KeyError: When the entry can't be found
         """
         if name in self.scenes:
             return self.scenes[name]
-        return "N/A"
+        raise KeyError
 
     async def turn_on_light_bulb(
         self, session: ClientSession, devid: str, brightness: int = 100, colour: str = "255:255:204"
@@ -177,6 +197,20 @@ class SwitchBotController:
             if device["deviceType"] == "Curtain3":
                 tasks.append(self.open_curtain(session, device["deviceId"]))
         await asyncio.gather(*tasks)
+
+    async def get_temperature(self, session: ClientSession, devid: str) -> float:
+        """Get the temperature in Celsius from a specific device
+
+        Parameters:
+            session (ClientSession): An aiohttp session to be used for all the switchbot requests
+            devid (str): The device ID
+        """
+        get_url = f"{self.base_url}v1.1/devices/{devid}/status"
+        while True:
+            resp = await session.get(get_url, headers=self.headers)
+            status = await resp.text()
+            status = json.loads(status)["body"]
+            return status['temperature']
 
     async def turn_on_plug_alarm(self, session: ClientSession, devid: str) -> None:
         """Turn on a specific alarm Plug Mini.

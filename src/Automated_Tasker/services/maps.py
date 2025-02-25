@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from Automated_Tasker.utils.vault import Vault
+import googlemaps
 import aiohttp
 
 class GoogleMapsClient:
@@ -9,7 +10,7 @@ class GoogleMapsClient:
     Requires the Google Cloud API key for the account under the vault entry tag 'google-maps-api-key'.
     This is a paid service, but I'm hoping the volumes are so low the price is negligable"""
 
-    URL = "https://maps.googleapis.com/maps/api/distancematrix/json"
+    URL = "/maps/api/distancematrix/json"
 
     def __init__(self, vault: Vault):
         """Start all the SwitchBot alarm devices.
@@ -18,6 +19,7 @@ class GoogleMapsClient:
             vault (Vault | None): The vault with the google maps API key
         """
         self.api_key = vault.load_entries().get("google-maps-api-key")
+        self.client = googlemaps.Client(self.api_key)
 
     async def get_distance(
             self,
@@ -44,14 +46,11 @@ class GoogleMapsClient:
         params = {
             "origins": origin,
             "destinations": destination,
-            "mode": mode,
+            "transit_mode": mode,
             "units": units,
             "arrival_time": arrival_time,
-            "key": self.api_key
         }
-        async with aiohttp.ClientSession() as session:
-            async with session.get(GoogleMapsClient.URL, params=params) as response:
-                data = await response.json()
+        data = self.client._request(GoogleMapsClient.URL, params)
 
         if "rows" not in data:
             raise ValueError("Failed to fetch data")

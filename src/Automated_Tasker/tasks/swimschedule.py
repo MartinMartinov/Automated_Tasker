@@ -20,7 +20,7 @@ class GetSwimSchedule:
 
     NAME: str = "SwimSchedulePoster"
     TIME: timedelta = timedelta(hours=16)
-    DAYS: List[str] = []
+    DAYS: List[str] = ['Tuesday','Friday']
     DAY: int = 0
 
     async def execute(self, vault: Vault | None = None):
