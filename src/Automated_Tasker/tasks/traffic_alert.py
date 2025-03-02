@@ -92,8 +92,8 @@ class SetTrafficAlerts:
                     ):
                     self.name = name
                     self.api_dict = api_dict
-                    self.arrival_time = arrival_time
                     self.fallback_time = fallback_time
+                    self.arrival_time = arrival_time
 
                 async def execute(self, _: Vault | None = None):
                     """Start all the SwitchBot alarm devices."""
@@ -109,14 +109,13 @@ class SetTrafficAlerts:
                         departure_time = convert_timedelta(self.arrival_time-timedelta(seconds=seconds))
                         notifier.send_notification(
                             f"ETA for {self.name}",
-                            f"Leave at {departure_time} to get there for {convert_timedelta(self.arrival_time)}",
+                            f"Leave at {departure_time} to get there for {self.arrival_time}",
                         )
                         return
                     notifier.send_notification(
                         f"Fallback ETA for {self.name}",
-                        f"Leave at {self.fallback_time} to get there for {convert_timedelta(self.arrival_time)}",
+                        f"Leave at {self.fallback_time} to get there for {self.arrival_time}",
                     )
-                    
 
-            Tasks.add_daily_tasklist(TrafficAlert(name, api_dict, arrival_time, fallback_time))
+            Tasks.add_daily_tasklist(TrafficAlert(name, api_dict, fallback_time, arrival_time))
             logger.info(f"Added TrafficAlert at ({recheck_time}) to daily tasklist.")

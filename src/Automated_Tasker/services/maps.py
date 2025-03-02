@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from Automated_Tasker.utils.vault import Vault
 import googlemaps
-import aiohttp
 
 class GoogleMapsClient:
     """A class for accessing Google Maps APIs using the oauth2 API and Google Cloud Projects.
