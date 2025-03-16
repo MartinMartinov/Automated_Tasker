@@ -76,7 +76,7 @@ class SetTrafficAlerts:
             fallback_time = convert_timedelta(arrival_time-(timedelta(seconds=seconds)))
             recheck_time = convert_timedelta(arrival_time-(2*timedelta(seconds=seconds)))
             class TrafficAlert:
-                """An etheral task created for checking travel time before going somewhere."""
+                """An ethereal task created for checking travel time before going somewhere."""
 
                 NAME: str = "TrafficAlert"
                 TIME: timedelta = recheck_time
@@ -86,12 +86,15 @@ class SetTrafficAlerts:
                 def __init__(
                         self,
                         name: str,
+                        *,
                         api_dict: dict[str, Any],
                         fallback_time: datetime,
-                        arrival_time: datetime
+                        arrival_time: datetime,
+                        vault: Vault,
                     ):
                     self.name = name
                     self.api_dict = api_dict
+                    self.maps = GoogleMapsClient(vault)
                     self.fallback_time = fallback_time
                     self.arrival_time = arrival_time
 
@@ -100,7 +103,7 @@ class SetTrafficAlerts:
                     seconds = None
                     for _ in range(5): # Try five times while catching exceptions
                         try:
-                            seconds = timeparse((await maps.get_distance(**self.api_dict))['duration'])
+                            seconds = timeparse((await self.maps.get_distance(**self.api_dict))['duration'])
                             break
                         except:
                             await asyncio.sleep(5)
@@ -117,5 +120,13 @@ class SetTrafficAlerts:
                         f"Leave at {self.fallback_time} to get there for {self.arrival_time}",
                     )
 
-            Tasks.add_daily_tasklist(TrafficAlert(name, api_dict, fallback_time, arrival_time))
+            Tasks.add_daily_tasklist(
+                TrafficAlert(
+                    name,
+                    api_dict=api_dict,
+                    fallback_time=fallback_time,
+                    arrival_time=arrival_time,
+                    vault=vault,
+                )
+            )
             logger.info(f"Added TrafficAlert at ({recheck_time}) to daily tasklist.")
