@@ -124,14 +124,14 @@ class SetTrafficAlerts:
                         departure_time = convert_timedelta(self.arrival_time - timedelta(seconds=seconds))
                         notifier.send_notification(
                             f"ETA for {self.name}",
-                            f"Leave at {departure_time} to get there for {self.arrival_time}",
-                            directions_url(api_dict["origin"], api_dict["destination"]),
+                            f"Leave at {departure_time} to get there for {self.arrival_time}\n"
+                            f"{directions_url(api_dict["origin"], api_dict["destination"])}",
                         )
                         return
                     notifier.send_notification(
                         f"Fallback ETA for {self.name}",
-                        f"Leave at {self.fallback_time} to get there for {self.arrival_time}",
-                        directions_url(api_dict["origin"], api_dict["destination"]),
+                        f"Leave at {self.fallback_time} to get there for {self.arrival_time}\n"
+                        f"{directions_url(api_dict["origin"], api_dict["destination"])}",
                     )
 
             Tasks.add_daily_tasklist(
