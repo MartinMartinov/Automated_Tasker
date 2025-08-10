@@ -48,7 +48,7 @@ class SwitchBotController:
         async with session.get(url, headers=self.headers) as response:
             resp_json = await response.json()
             self.devices = resp_json.get("body", {}).get("deviceList", [])
-    
+
     def lookup_device(self, name: str) -> str:
         """Get device ID from device name
 
@@ -62,8 +62,8 @@ class SwitchBotController:
             KeyError: When the entry can't be found
         """
         for device in self.devices:
-            if name == device['deviceName']:
-                return device['deviceId']
+            if name == device["deviceName"]:
+                return device["deviceId"]
         raise KeyError
 
     async def fetch_scenes(self, session: ClientSession) -> None:
@@ -76,7 +76,7 @@ class SwitchBotController:
         async with session.get(url, headers=self.headers) as response:
             resp_json = await response.json()
             self.scenes = {scene["sceneName"]: scene["sceneId"] for scene in resp_json.get("body", [])}
-    
+
     def lookup_scene(self, name: str) -> str:
         """Get scene ID from scene name
 
@@ -85,7 +85,7 @@ class SwitchBotController:
 
         Returns:
             str: The ID corresponding to the name
-        
+
         Raises:
             KeyError: When the entry can't be found
         """
@@ -180,7 +180,7 @@ class SwitchBotController:
                 async with session.get(get_url, headers=self.headers, json=payload) as resp:
                     status = await resp.text()
                     status = json.loads(status)["body"]
-                if status["moving"] != 100: # I think 0 is fastest and 100 is slowest, API says this should be a bool
+                if status["moving"] != 100:  # I think 0 is fastest and 100 is slowest, API says this should be a bool
                     moving = False
 
             if int(status["slidePosition"]) < 20:
@@ -210,7 +210,21 @@ class SwitchBotController:
             resp = await session.get(get_url, headers=self.headers)
             status = await resp.text()
             status = json.loads(status)["body"]
-            return status['temperature']
+            return status["temperature"]
+
+    async def press_bot(self, session: ClientSession, devid: str) -> None:
+        """Turn on a specific alarm Plug Mini.
+
+        Parameters:
+            session (ClientSession): An aiohttp session to be used for all the switchbot requests
+            devid (str): The device ID
+        """
+        post_url = f"{self.base_url}v1.1/devices/{devid}/commands"
+        payload = {
+            "command": "press",
+            "commandType": "command",
+        }
+        await asyncio.gather(session.post(post_url, headers=self.headers, json=payload))
 
     async def turn_on_plug_alarm(self, session: ClientSession, devid: str) -> None:
         """Turn on a specific alarm Plug Mini.
@@ -257,6 +271,6 @@ class SwitchBotController:
         while True:
             async with session.post(url, headers=self.headers) as response:
                 resp = await response.json()
-            if 'message' not in resp or resp['message'] != 'success':
+            if "message" not in resp or resp["message"] != "success":
                 continue
             break

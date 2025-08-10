@@ -15,9 +15,10 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-SET_ALARM = (4, 30) # Hours, Minutes to set Alarm to
-DAY_START = (6, 30) # Hours, Minutes to notify in the morning
+SET_ALARM = (4, 30)  # Hours, Minutes to set Alarm to
+DAY_START = (6, 30)  # Hours, Minutes to notify in the morning
 WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+
 
 class _Task(Protocol):
     """The minimum tempalte for all the tasks registered by the tasklist."""
@@ -120,6 +121,7 @@ class TaskRegistry:
                     notifier = PushbulletNotifier(self.vault.load_entries()["pushbullet-key"])
                     notifier.send_notification(f"Task {task.NAME} failed to execute.", repr(e))
                     logger.info(f"{task.NAME} failed to execute, notified.")
+
 
 @functools.cache
 def _load_package(package: str) -> None:

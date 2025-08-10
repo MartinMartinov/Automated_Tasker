@@ -14,6 +14,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 @Tasks.register
 class StartNightLight:
     """A task for turning on the night scene set in switchbot."""

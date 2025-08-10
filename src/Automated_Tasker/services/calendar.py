@@ -97,7 +97,7 @@ class GoogleCalendarClient:
             return None
 
         events = events_result.get("items", [])
-        
+
         for event in events:
-            if 'dateTime' in event['start']:
+            if "dateTime" in event["start"]:
                 yield event

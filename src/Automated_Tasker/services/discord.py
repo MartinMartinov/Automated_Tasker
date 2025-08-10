@@ -2,6 +2,7 @@ import discord
 from discord.ext import commands
 import asyncio
 
+
 class DiscordBot(commands.Cog):
     def __init__(self, bot_token: str):
         intents = discord.Intents.all()
@@ -35,7 +36,7 @@ class DiscordBot(commands.Cog):
                 for channel in guild.text_channels:
                     if channel.name == channel_name:
                         await channel.send(message)
-    
+
     async def get_most_recent_message(self, guild_name: str, channel_name: str) -> str | None:
         """
         Retrieves the most recent message in a specific channel by name in a given guild.
