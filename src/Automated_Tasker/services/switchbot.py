@@ -269,8 +269,11 @@ class SwitchBotController:
         """
         url = f"{self.base_url}v1.1/scenes/{sceneId}/execute"
         while True:
-            async with session.post(url, headers=self.headers) as response:
-                resp = await response.json()
-            if "message" not in resp or resp["message"] != "success":
-                continue
-            break
+            try:
+                async with session.post(url, headers=self.headers) as response:
+                    resp = await response.json()
+                if "message" in resp and resp["message"] == "success":
+                    break
+            except KeyError:
+                pass
+            await asyncio.sleep(5)
