@@ -119,7 +119,7 @@ class TaskRegistry:
                     logger.info(f"{task.NAME} executed.")
                 except Exception as e:
                     notifier = PushbulletNotifier(self.vault.load_entries()["pushbullet-key"])
-                    notifier.send_notification(f"Task {task.NAME} failed to execute.", repr(e))
+                    notifier.send_notification(f"Task {task.NAME} failed to execute.", str(e.with_traceback()))
                     logger.info(f"{task.NAME} failed to execute, notified.")
 
 
