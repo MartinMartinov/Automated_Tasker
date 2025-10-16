@@ -66,33 +66,6 @@ class SwitchBotController:
                 return device["deviceId"]
         raise KeyError
 
-    async def fetch_scenes(self, session: ClientSession) -> None:
-        """Fetch the list of scenes and store them in the scenes dict, mapping sceneName to sceneId.
-
-        Parameters:
-            session (ClientSession): An aiohttp session to be used for all the switchbot requests
-        """
-        url = f"{self.base_url}v1.1/scenes"
-        async with session.get(url, headers=self.headers) as response:
-            resp_json = await response.json()
-            self.scenes = {scene["sceneName"]: scene["sceneId"] for scene in resp_json.get("body", [])}
-
-    def lookup_scene(self, name: str) -> str:
-        """Get scene ID from scene name
-
-        Parameters:
-            name (str): The name of the scene
-
-        Returns:
-            str: The ID corresponding to the name
-
-        Raises:
-            KeyError: When the entry can't be found
-        """
-        if name in self.scenes:
-            return self.scenes[name]
-        raise KeyError
-
     async def turn_on_light_bulb(
         self, session: ClientSession, devid: str, brightness: int = 100, colour: str = "255:255:204"
     ) -> None:
@@ -260,6 +233,42 @@ class SwitchBotController:
                 tasks.append(self.turn_on_plug_alarm(session, device["deviceId"]))
         await asyncio.gather(*tasks)
 
+    async def fetch_scenes(self, session: ClientSession) -> None:
+        """Fetch the list of scenes and store them in the scenes dict, mapping sceneName to sceneId.
+
+        Parameters:
+            session (ClientSession): An aiohttp session to be used for all the switchbot requests
+        """
+        url = f"{self.base_url}v1.1/scenes"
+        while True:
+            try:
+                async with session.get(url, headers=self.headers) as response:
+                    resp = await response.json()
+                    # Weird bug that returns the 3 default scenes sometimes
+                    # so check to make sure there are more than 5
+                    if "message" in resp and resp["message"] == "success" and len(resp["body"]) > 5:
+                        self.scenes = {scene["sceneName"]: scene["sceneId"] for scene in resp["body"]}
+                        return
+            except KeyError:
+                pass
+            await asyncio.sleep(5)
+
+    def lookup_scene(self, name: str) -> str:
+        """Get scene ID from scene name
+
+        Parameters:
+            name (str): The name of the scene
+
+        Returns:
+            str: The ID corresponding to the name
+
+        Raises:
+            KeyError: When the entry can't be found
+        """
+        if name in self.scenes:
+            return self.scenes[name]
+        raise KeyError
+
     async def activate_scene(self, session: ClientSession, sceneId: str) -> None:
         """Active the specific scene.
 
@@ -272,8 +281,8 @@ class SwitchBotController:
             try:
                 async with session.post(url, headers=self.headers) as response:
                     resp = await response.json()
-                if "message" in resp and resp["message"] == "success":
-                    break
+                    if "message" in resp and resp["message"] == "success":
+                        return
             except KeyError:
                 pass
             await asyncio.sleep(5)

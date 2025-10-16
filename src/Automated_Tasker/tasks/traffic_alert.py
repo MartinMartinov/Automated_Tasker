@@ -59,7 +59,6 @@ class SetTrafficAlerts:
         calendar = GoogleCalendarClient(vault)
         maps = GoogleMapsClient(vault)
         home_address = vault.load_entries()["home-address"]
-        notifier = PushbulletNotifier(vault.load_entries()["pushbullet-key"])
 
         for event in calendar.get_todays_events():
             if "location" not in event:
@@ -108,10 +107,12 @@ class SetTrafficAlerts:
                     self.vault = vault
                     self.fallback_time = fallback_time
                     self.arrival_time = arrival_time
+                    notifier = PushbulletNotifier(vault.load_entries()["pushbullet-key"])
 
                 async def execute(self, _: Vault | None = None):
                     """Start all the SwitchBot alarm devices."""
                     seconds = None
+                    notifier = PushbulletNotifier(vault.load_entries()["pushbullet-key"])
                     for _ in range(5):  # Try five times while catching exceptions
                         try:
                             maps = GoogleMapsClient(self.vault)
@@ -127,12 +128,14 @@ class SetTrafficAlerts:
                             f"Leave at {departure_time} to get there for {self.arrival_time}\n"
                             f"{directions_url(api_dict["origin"], api_dict["destination"])}",
                         )
+                        await asyncio.sleep(30)
                         return
                     notifier.send_notification(
                         f"Fallback ETA for {self.name}",
                         f"Leave at {self.fallback_time} to get there for {self.arrival_time}\n"
                         f"{directions_url(api_dict["origin"], api_dict["destination"])}",
                     )
+                    await asyncio.sleep(30)
 
             Tasks.add_daily_tasklist(
                 TrafficAlert(

@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Protocol, List, Final, Deque, TypeVar, Any
 import importlib
 import functools
+import traceback
 from datetime import timedelta, datetime
 import collections
 import pkgutil
@@ -119,7 +120,10 @@ class TaskRegistry:
                     logger.info(f"{task.NAME} executed.")
                 except Exception as e:
                     notifier = PushbulletNotifier(self.vault.load_entries()["pushbullet-key"])
-                    notifier.send_notification(f"Task {task.NAME} failed to execute.", str(e.with_traceback()))
+                    notifier.send_notification(
+                        f"Task {task.NAME} failed to execute.",
+                        f"{repr(e)}\n{traceback.format_exc()}"
+                    )
                     logger.info(f"{task.NAME} failed to execute, notified.")
 
 

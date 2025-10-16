@@ -38,11 +38,26 @@ class SetAlarm:
                 continue
 
             alarm_time = timedelta(minutes=30)
+            now = datetime.now()
+            now_time = timedelta(
+                hours=now.hour,
+                minutes=now.minute,
+                seconds=now.second,
+                microseconds=now.microsecond
+            )
+
+            tokens = vault.load_entries()
+            controller = SwitchBotController(tokens["switchbot-token"], tokens["switchbot-secret"])
+            async with ClientSession() as session:
+                await controller.fetch_scenes(session)
+            if alarm_time > now_time:
+                return
+
             if "overrides" in event["reminders"]:
                 offset = timedelta(minutes=event["reminders"]["overrides"][0]["minutes"])
                 etime = datetime.strptime(event["start"]["dateTime"][:19], "%Y-%m-%dT%H:%M:%S") - offset
                 alarm_time = timedelta(hours=etime.hour, minutes=etime.minute, seconds=etime.second)
-            coffee_time = alarm_time - timedelta(minutes=15)
+            coffee_time = alarm_time - timedelta(minutes=10)
 
             class Alarm:
                 """An etheral task created for setting off an alarm at a variable time."""
