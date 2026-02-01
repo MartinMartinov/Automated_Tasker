@@ -16,6 +16,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+TIME_GRADIENT = 60*10 # seconds
 
 @Tasks.register
 class SetAlarm:
@@ -39,25 +40,18 @@ class SetAlarm:
 
             alarm_time = timedelta(minutes=30)
             now = datetime.now()
-            now_time = timedelta(
-                hours=now.hour,
-                minutes=now.minute,
-                seconds=now.second,
-                microseconds=now.microsecond
-            )
+            now_time = timedelta(hours=now.hour, minutes=now.minute, seconds=now.second, microseconds=now.microsecond)
 
             tokens = vault.load_entries()
-            controller = SwitchBotController(tokens["switchbot-token"], tokens["switchbot-secret"])
-            async with ClientSession() as session:
-                await controller.fetch_scenes(session)
-            if alarm_time > now_time:
-                return
 
             if "overrides" in event["reminders"]:
                 offset = timedelta(minutes=event["reminders"]["overrides"][0]["minutes"])
                 etime = datetime.strptime(event["start"]["dateTime"][:19], "%Y-%m-%dT%H:%M:%S") - offset
                 alarm_time = timedelta(hours=etime.hour, minutes=etime.minute, seconds=etime.second)
-            coffee_time = alarm_time - timedelta(minutes=10)
+                alarm_time -= timedelta(seconds=60*10) # 10 minutes earlier to start coffee brewing
+
+            if alarm_time < now_time:
+                return
 
             class Alarm:
                 """An etheral task created for setting off an alarm at a variable time."""
@@ -76,31 +70,26 @@ class SetAlarm:
                     tokens = vault.load_entries()
                     controller = SwitchBotController(tokens["switchbot-token"], tokens["switchbot-secret"])
                     async with ClientSession() as session:
-                        await controller.fetch_scenes(session)
-                        await controller.activate_scene(session, controller.lookup_scene("Alarm Start"))
-
-            class Coffee:
-                """An etheral task created for making coffee at a variable time."""
-
-                NAME: str = "Nespresso"
-                TIME: timedelta = coffee_time
-                DAYS: List[str] = []
-                DAY: int = 0
-
-                async def execute(self, vault: Vault | None = None):
-                    """Start all the SwitchBot alarm devices.
-
-                    Parameters:
-                        vault (Vault | None): The vault with the switchbot token and secret
-                    """
-                    tokens = vault.load_entries()
-                    controller = SwitchBotController(tokens["switchbot-token"], tokens["switchbot-secret"])
-                    async with ClientSession() as session:
-                        await controller.fetch_devices(session)
-                        await controller.press_bot(session, controller.lookup_device("Nespresso"))
-                        await asyncio.sleep(60)
-                        await controller.press_bot(session, controller.lookup_device("Nespresso"))
+                        await controller.refresh(session)
+                        try:
+                            await controller.press_bot(controller, session, "Nespresso")
+                            asyncio.sleep(30)
+                            await controller.press_bot(controller, session, "Nespresso")
+                        except ConnectionError:
+                            pass
+                        asyncio.sleep(60*10)
+                        await controller.refresh(session)
+                        await asyncio.gather(
+                            controller.open_curtain(session, "Curtain"),
+                            controller.turn_on_light_bulb(session, "Left Bulb"),
+                            controller.turn_on_light_bulb(session, "Right Bulb"),
+                            return_exceptions=True,
+                        )
+                        asyncio.sleep(60*5)
+                        try:
+                            await controller.open_curtain(session, "Alarm Light")
+                        except ConnectionError:
+                            pass
 
             Tasks.add_daily_tasklist(Alarm())
-            Tasks.add_daily_tasklist(Coffee())
             logger.info(f"Added Alarm ({alarm_time}) to daily tasklist.")

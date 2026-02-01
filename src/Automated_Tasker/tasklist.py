@@ -7,10 +7,9 @@ import traceback
 from datetime import timedelta, datetime
 import collections
 import pkgutil
-from Automated_Tasker.utils.vault import Vault
+from Automated_Tasker.utils.vault import vault
 from Automated_Tasker.services.pushbullet import PushbulletNotifier
 from pytz import timezone
-from getpass import getpass
 
 import logging
 
@@ -44,7 +43,7 @@ class TaskRegistry:
         self._package_name = package
         self.global_tasklist: Deque[Any] = collections.deque()
         self.current_tasklist: Deque[Any] = collections.deque()
-        self.vault = Vault(getpass("Vault password: "))
+        self.vault = vault
 
     def load(self) -> None:
         """Invoke the _load_package() function on _package_name (if initiliazed)."""
@@ -121,8 +120,7 @@ class TaskRegistry:
                 except Exception as e:
                     notifier = PushbulletNotifier(self.vault.load_entries()["pushbullet-key"])
                     notifier.send_notification(
-                        f"Task {task.NAME} failed to execute.",
-                        f"{repr(e)}\n{traceback.format_exc()}"
+                        f"Task {task.NAME} failed to execute.", f"{repr(e)}\n{traceback.format_exc()}"
                     )
                     logger.info(f"{task.NAME} failed to execute, notified.")
 

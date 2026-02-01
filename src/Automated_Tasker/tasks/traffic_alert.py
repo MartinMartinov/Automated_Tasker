@@ -60,12 +60,20 @@ class SetTrafficAlerts:
         maps = GoogleMapsClient(vault)
         home_address = vault.load_entries()["home-address"]
 
+        previous_event = None
         for event in calendar.get_todays_events():
             if "location" not in event:
                 continue
 
             arrival_time = datetime.strptime(event["start"]["dateTime"][:19], "%Y-%m-%dT%H:%M:%S")
             arrival_time -= timedelta(minutes=5)
+
+            origin = home_address
+            if previous_event and "location" in previous_event:
+                end_time = datetime.strptime(event["end"]["dateTime"][:19], "%Y-%m-%dT%H:%M:%S")
+                if end_time < (arrival_time - timedelta(minutes=60)):
+                    origin = previous_event["location"]
+
             api_dict = dict(
                 origin=home_address,
                 destination=event["location"],
@@ -84,6 +92,7 @@ class SetTrafficAlerts:
 
             fallback_time = convert_timedelta(arrival_time - (timedelta(seconds=seconds)))
             recheck_time = convert_timedelta(arrival_time - (2 * timedelta(seconds=seconds)))
+            previous_event = event
 
             class TrafficAlert:
                 """An ethereal task created for checking travel time before going somewhere."""
@@ -107,12 +116,11 @@ class SetTrafficAlerts:
                     self.vault = vault
                     self.fallback_time = fallback_time
                     self.arrival_time = arrival_time
-                    notifier = PushbulletNotifier(vault.load_entries()["pushbullet-key"])
 
                 async def execute(self, _: Vault | None = None):
                     """Start all the SwitchBot alarm devices."""
                     seconds = None
-                    notifier = PushbulletNotifier(vault.load_entries()["pushbullet-key"])
+                    notifier = PushbulletNotifier(self.vault.load_entries()["pushbullet-key"])
                     for _ in range(5):  # Try five times while catching exceptions
                         try:
                             maps = GoogleMapsClient(self.vault)

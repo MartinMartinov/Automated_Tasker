@@ -10,6 +10,14 @@ import json
 
 from aiohttp import ClientSession
 
+NUM_RETRIES = 10
+WAIT_RETRIES = 5  # Seconds
+
+URL = "https://api.switch-bot.com/"
+
+# You're gonna want these API docs:
+# https://github.com/OpenWonderLabs/SwitchBotAPI
+
 
 class SwitchBotController:
     """A class for performing necessary switchbot operations.
@@ -18,6 +26,12 @@ class SwitchBotController:
     """
 
     def __init__(self, token: str, secret: str):
+        """Initiate the controller for an account (and fetch scenes/devices if given a session).
+
+        Parameters:
+            token: The token given for a SwitchBot account
+            secret: The secret given for a SwitchBot account
+        """
         nonce = uuid.uuid4()
         t = int(round(time.time() * 1000))
         string_to_sign = "{}{}{}".format(token, t, nonce)
@@ -27,7 +41,6 @@ class SwitchBotController:
 
         sign = base64.b64encode(hmac.new(secret, msg=string_to_sign, digestmod=hashlib.sha256).digest())
 
-        self.base_url = "https://api.switch-bot.com/"
         self.headers = {
             "Authorization": token,
             "Content-Type": "application/json; charset=utf8",
@@ -35,254 +48,187 @@ class SwitchBotController:
             "sign": str(sign, "utf-8"),
             "nonce": str(nonce),
         }
-        self.devices = []
+        self.devices = {}
         self.scenes = {}
 
-    async def fetch_devices(self, session: ClientSession) -> None:
+    async def refresh(self, session: ClientSession) -> None:
+        """Fetch all lists to populate the class.
+
+        Parameters:
+            session: An aiohttp session to be used for all the switchbot requests
+
+        Raises:
+            ConnectionError: Raised if only bad responses are received after NUM_RETRIES attemps
+        """
+        await self.get_devices(session)
+        await self.get_scenes(session)
+
+    async def get_devices(self, session: ClientSession) -> None:
         """Fetch the list of devices and store them in the devices list.
 
         Parameters:
-            session (ClientSession): An aiohttp session to be used for all the switchbot requests
-        """
-        url = f"{self.base_url}v1.1/devices"
-        async with session.get(url, headers=self.headers) as response:
-            resp_json = await response.json()
-            self.devices = resp_json.get("body", {}).get("deviceList", [])
-
-    def lookup_device(self, name: str) -> str:
-        """Get device ID from device name
-
-        Parameters:
-            name (str): The name of the device
-
-        Returns:
-            str: The ID corresponding to the name
+            session: An aiohttp session to be used for all the switchbot requests
 
         Raises:
-            KeyError: When the entry can't be found
+            ConnectionError: Raised if only bad responses are received after NUM_RETRIES attemps
         """
-        for device in self.devices:
-            if name == device["deviceName"]:
-                return device["deviceId"]
-        raise KeyError
-
-    async def turn_on_light_bulb(
-        self, session: ClientSession, devid: str, brightness: int = 100, colour: str = "255:255:204"
-    ) -> None:
-        """Turn every a specefic lightbult on (to brightness and colour).
-
-        Parameters:
-            session (ClientSession): An aiohttp session to be used for all the switchbot requests
-            devid (str): The device ID
-            brightness (int): A number between 1-100 (inclusive) to set the brightness
-            colour (str): A colour defined by an 256 RGB string (i.e., R:G:B)
-        """
-        complete = False
-        post_url = f"{self.base_url}v1.1/devices/{devid}/commands"
-        get_url = f"{self.base_url}v1.1/devices/{devid}/status"
-        commands = [
-            ("turnOn", "default"),
-            ("setBrightness", str(brightness)),
-            ("setColor", colour),
-        ]
-        while not complete:
-            tasks = []
-            for command, parameter in commands:
-                payload = {
-                    "command": command,
-                    "parameter": parameter,
-                    "commandType": "command",
-                }
-                tasks.append(session.post(post_url, headers=self.headers, json=payload))
-            await asyncio.gather(*tasks)
-            await asyncio.sleep(5)  # Rough timeout guess
-            async with session.get(get_url, headers=self.headers, json=payload) as resp:
-                if not resp.ok:
+        for _ in range(NUM_RETRIES):
+            async with session.get(f"{URL}v1.1/devices", headers=self.headers) as response:
+                if not response.ok:
+                    await asyncio.sleep(WAIT_RETRIES)
                     continue
-                status = await resp.text()
-                status = json.loads(status)["body"]
-            complete = True
-            commands = []
-            if status["power"] != "on":
-                complete = False
-                commands.append(("turnOn", "default"))
-            if status["brightness"] != 100:
-                complete = False
-                commands.append(("setBrightness", str(brightness)))
-            if status["color"] != "255:255:204":
-                complete = False
-                commands.append(("setColor", colour))
+                listings = (await response.json())["body"]["deviceList"]
+                self.devices = {device["deviceName"]: device["deviceId"] for device in listings}
+                return
+        raise ConnectionError("Could not get devices")
 
-    async def turn_on_light_bulbs(
-        self, session: ClientSession, brightness: int = 100, colour: str = "255:255:204"
+    async def get_scenes(self, session: ClientSession) -> None:
+        """Fetch the list of scenes and store them in the scenes dict, mapping sceneName to sceneId.
+
+        Parameters:
+            session: An aiohttp session to be used for all the switchbot requests
+
+        Raises:
+            ConnectionError: Raised if only bad responses are received after NUM_RETRIES attemps
+        """
+        for _ in range(NUM_RETRIES):
+            async with session.get(f"{URL}v1.1/scenes", headers=self.headers) as response:
+                if not response.ok:
+                    await asyncio.sleep(WAIT_RETRIES)
+                    continue
+                listings = (await response.json())
+                self.scenes = {scene["sceneName"]: scene["sceneId"] for scene in listings["body"]}
+                return
+        raise ConnectionError("Could not get scenes")
+
+    async def command(self, session: ClientSession, device: str, payload: str) -> None:
+        """Post a command to a device.
+
+        Parameters:
+            session: An aiohttp session to be used for all the switchbot requests
+            device: The name of the device to have the command pushed to it
+            payload: The payload containing the command to be given
+
+        Raises:
+            ConnectionError: Raised if only bad responses are received after NUM_RETRIES attemps
+        """
+        for _ in range(NUM_RETRIES):
+            async with session.post(
+                f"{URL}v1.1/devices/{self.devices[device]}/commands", headers=self.headers, json=payload
+            ) as response:
+                if not response.ok:
+                    await asyncio.sleep(WAIT_RETRIES)
+                    continue
+                return
+        raise ConnectionError("Could not send command")
+
+    async def status(self, session: ClientSession, device: str) -> Any:
+        """Pull the status of a device.
+
+        Parameters:
+            session: An aiohttp session to be used for all the switchbot requests
+            device: The name of the device to have the command pushed to it
+
+        Raises:
+            ConnectionError: Raised if only bad responses are received after NUM_RETRIES attemps
+        """
+        for _ in range(NUM_RETRIES):
+            async with session.get(f"{URL}v1.1/devices/{self.devices[device]}/status", headers=self.headers) as response:
+                if not response.ok:
+                    await asyncio.sleep(WAIT_RETRIES)
+                    continue
+                return (await response.json())["body"]
+        raise ConnectionError("Could not get status")
+
+    async def execute(self, session: ClientSession, scene: str) -> None:
+        """Active the specific scene.
+
+        Parameters:
+            session: An aiohttp session to be used for all the switchbot requests
+            scene: The scene pulled from the scenes dict to execute
+        """
+        for _ in range(NUM_RETRIES):
+            async with session.get(f"{URL}v1.1/scenes/{self.scenes[scene]}/execute", headers=self.headers) as response:
+                if not response.ok:
+                    await asyncio.sleep(WAIT_RETRIES)
+                    continue
+                return
+        raise ConnectionError("Could not execute scene")
+    
+    async def turn_on_light_bulb(
+        self,
+        session: ClientSession,
+        device: str,
+        brightness: int = 100,
+        colour: str = "255:255:204",
     ) -> None:
-        """Turn every lightbult listed on (to brightness and colour) asynchronously.
+        """Turn every a specefic lightbulb on (to brightness and colour).
 
         Parameters:
-            session (ClientSession): An aiohttp session to be used for all the switchbot requests
-            brightness (int): A number between 1-100 (inclusive) to set the brightness
-            colour (str): A colour defined by an 256 RGB string (i.e., R:G:B)
+            session: An aiohttp session to be used for all the switchbot requests
+            device: The device ID
+            brightness: A number between 1-100 (inclusive) to set the brightness
+            colour: A colour defined by an 256 RGB string (i.e., R:G:B)
         """
-        tasks = []
-        for device in self.devices:
-            if device["deviceType"] == "Color Bulb":
-                tasks.append(self.turn_on_light_bulb(session, device["deviceId"], brightness, colour))
-        await asyncio.gather(*tasks)
+        tasks = [
+            ("power", "on", "turnOn", "default"), 
+            ("brightness", brightness, "setBrightness", brightness), 
+            ("color", colour, "setColor", colour),
+         ]
+        for _ in range(0, 10):
+            status = await self.status(session, device)
+            if all(status[key] == value for key, value, _, _ in tasks):
+                return
 
-    async def open_curtain(self, session: ClientSession, devid: str) -> None:
-        """Open a specific Curtain3 device.
+            for key, value, cmd, param in tasks:
+                if status[key] != value:
+                    await self.command(session, device, {"command": cmd, "parameter": param, "commandType": "command"})
+
+            await asyncio.sleep(5)
+
+    async def turn_on_socket(
+        self,
+        session: ClientSession,
+        device: str,
+    ) -> None:
+        """Turn every a specefic lightbulb on (to brightness and colour).
 
         Parameters:
-            session (ClientSession): An aiohttp session to be used for all the switchbot requests
-            devid (str): The device ID
+            session: An aiohttp session to be used for all the switchbot requests
+            device: The device ID
         """
-        post_url = f"{self.base_url}v1.1/devices/{devid}/commands"
-        get_url = f"{self.base_url}v1.1/devices/{devid}/status"
-        while True:
-            payload = {
+        for _ in range(0, 10):
+            status = await self.status(session, device)
+            if status["power"] == "on":
+                return
+
+            await self.command(session, device, {"command": "turnOn", "commandType": "command"})
+            await asyncio.sleep(5)
+
+    async def open_curtain(
+        self,
+        session: ClientSession,
+        device: str
+    ) -> None:
+        """Turn every a specefic lightbulb on (to brightness and colour).
+
+        Parameters:
+            session: An aiohttp session to be used for all the switchbot requests
+            device: The device ID
+        """
+        for _ in range(0, 10):
+            status = await self.status(session, device)
+            if "moving" in status and status["moving"] != False:
+                await asyncio.sleep(30)
+                status = await self.status(session, device)
+
+            if status["slidePosition"] < 10:
+                return
+
+            await self.command(session, device, {
                 "command": "setPosition",
                 "parameter": "0,1,0",
                 "mode": "1",
                 "commandType": "command",
-            }
-            resp = await asyncio.gather(session.post(post_url, headers=self.headers, json=payload))
-            await asyncio.sleep(5)  # Rough timeout guess
-            moving = True
-            while moving:
-                await asyncio.sleep(30)  # Curtain moves real slow
-                async with session.get(get_url, headers=self.headers, json=payload) as resp:
-                    status = await resp.text()
-                    status = json.loads(status)["body"]
-                if status["moving"] != 100:  # I think 0 is fastest and 100 is slowest, API says this should be a bool
-                    moving = False
-
-            if int(status["slidePosition"]) < 20:
-                break
-
-    async def open_curtains(self, session: ClientSession) -> None:
-        """Open every Curtain3 device in devices asynchronously.
-
-        Parameters:
-            session (ClientSession): An aiohttp session to be used for all the switchbot requests
-        """
-        tasks = []
-        for device in self.devices:
-            if device["deviceType"] == "Curtain3":
-                tasks.append(self.open_curtain(session, device["deviceId"]))
-        await asyncio.gather(*tasks)
-
-    async def get_temperature(self, session: ClientSession, devid: str) -> float:
-        """Get the temperature in Celsius from a specific device
-
-        Parameters:
-            session (ClientSession): An aiohttp session to be used for all the switchbot requests
-            devid (str): The device ID
-        """
-        get_url = f"{self.base_url}v1.1/devices/{devid}/status"
-        while True:
-            resp = await session.get(get_url, headers=self.headers)
-            status = await resp.text()
-            status = json.loads(status)["body"]
-            return status["temperature"]
-
-    async def press_bot(self, session: ClientSession, devid: str) -> None:
-        """Turn on a specific alarm Plug Mini.
-
-        Parameters:
-            session (ClientSession): An aiohttp session to be used for all the switchbot requests
-            devid (str): The device ID
-        """
-        post_url = f"{self.base_url}v1.1/devices/{devid}/commands"
-        payload = {
-            "command": "press",
-            "commandType": "command",
-        }
-        await asyncio.gather(session.post(post_url, headers=self.headers, json=payload))
-
-    async def turn_on_plug_alarm(self, session: ClientSession, devid: str) -> None:
-        """Turn on a specific alarm Plug Mini.
-
-        Parameters:
-            session (ClientSession): An aiohttp session to be used for all the switchbot requests
-            devid (str): The device ID
-        """
-        post_url = f"{self.base_url}v1.1/devices/{devid}/commands"
-        get_url = f"{self.base_url}v1.1/devices/{devid}/status"
-        while True:
-            payload = {
-                "command": "turnOn",
-                "commandType": "command",
-            }
-            resp = await asyncio.gather(session.post(post_url, headers=self.headers, json=payload))
-            await asyncio.sleep(5)  # Rough timeout guess
-            async with session.get(get_url, headers=self.headers, json=payload) as resp:
-                status = await resp.text()
-                status = json.loads(status)["body"]
-                if status["power"] == "on":
-                    break
-
-    async def turn_on_plug_alarms(self, session: ClientSession) -> None:
-        """Turn on every Plug Mini whose name starts with Alarm in devices asynchronously.
-
-        Parameters:
-            session (ClientSession): An aiohttp session to be used for all the switchbot requests
-        """
-        tasks = []
-        for device in self.devices:
-            if device["deviceName"].startswith("Alarm") and device["deviceType"] == "Plug Mini (US)":
-                tasks.append(self.turn_on_plug_alarm(session, device["deviceId"]))
-        await asyncio.gather(*tasks)
-
-    async def fetch_scenes(self, session: ClientSession) -> None:
-        """Fetch the list of scenes and store them in the scenes dict, mapping sceneName to sceneId.
-
-        Parameters:
-            session (ClientSession): An aiohttp session to be used for all the switchbot requests
-        """
-        url = f"{self.base_url}v1.1/scenes"
-        while True:
-            try:
-                async with session.get(url, headers=self.headers) as response:
-                    resp = await response.json()
-                    # Weird bug that returns the 3 default scenes sometimes
-                    # so check to make sure there are more than 5
-                    if "message" in resp and resp["message"] == "success" and len(resp["body"]) > 5:
-                        self.scenes = {scene["sceneName"]: scene["sceneId"] for scene in resp["body"]}
-                        return
-            except KeyError:
-                pass
-            await asyncio.sleep(5)
-
-    def lookup_scene(self, name: str) -> str:
-        """Get scene ID from scene name
-
-        Parameters:
-            name (str): The name of the scene
-
-        Returns:
-            str: The ID corresponding to the name
-
-        Raises:
-            KeyError: When the entry can't be found
-        """
-        if name in self.scenes:
-            return self.scenes[name]
-        raise KeyError
-
-    async def activate_scene(self, session: ClientSession, sceneId: str) -> None:
-        """Active the specific scene.
-
-        Parameters:
-            session (ClientSession): An aiohttp session to be used for all the switchbot requests
-            sceneId (str): The sceneId pulled from the scenes dict to execute
-        """
-        url = f"{self.base_url}v1.1/scenes/{sceneId}/execute"
-        while True:
-            try:
-                async with session.post(url, headers=self.headers) as response:
-                    resp = await response.json()
-                    if "message" in resp and resp["message"] == "success":
-                        return
-            except KeyError:
-                pass
+            })
             await asyncio.sleep(5)

@@ -6,13 +6,15 @@ import base64
 import json
 from pathlib import Path
 import random
+from getpass import getpass
 
+vault_password = getpass("Vault password: ")
 
 class Vault:
     """A class for storing various sensitive pieces of data encrypted with a provided password."""
 
-    def __init__(self, password, file_name="entries.json"):
-        self.password = password
+    def __init__(self, file_name="entries.json"):
+        self.password = vault_password
         self.file_path = self.get_vault_directory() / file_name
 
     @staticmethod
@@ -144,3 +146,5 @@ class Vault:
                 raise e
 
         return decrypted_entries
+
+vault = Vault()

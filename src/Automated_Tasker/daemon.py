@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from Automated_Tasker.tasklist import Tasks
+from Automated_Tasker.subdaemon import Subdaemons
 from datetime import datetime
 import asyncio
 
@@ -21,6 +22,7 @@ class Daemon:
         )
         logger.info("Daemon initiated.")
         Tasks.load()
+        Subdaemons.load()
 
     def new_day(self) -> None:
         """Generate a new list based on the global registry."""
@@ -28,9 +30,12 @@ class Daemon:
 
     async def main_loop(self) -> None:
         """The main loop doing regular checks on daily tasks every LOOP_WAIT seconds."""
+        logger.info("Initiating subdaemons.")
+        Subdaemons.start()
         logger.info("Entering main loop.")
         while True:
             current = datetime.now().day
+            Subdaemons.restart_failed()
             if self.day != current:
                 self.new_day()
                 self.day = current

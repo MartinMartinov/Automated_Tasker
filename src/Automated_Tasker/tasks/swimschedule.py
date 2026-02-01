@@ -15,7 +15,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-@Tasks.register
+# @Tasks.register
 class GetSwimSchedule:
     """A task for getting City of Ottawa pool schedules."""
 
