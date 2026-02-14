@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 SET_ALARM = (4, 30)  # Hours, Minutes to set Alarm to
 DAY_START = (6, 30)  # Hours, Minutes to notify in the morning
+DAY_END   = (11,30)  # Hours, Minutes to notify at night
 WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
 

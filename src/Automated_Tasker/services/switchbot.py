@@ -155,14 +155,14 @@ class SwitchBotController:
                 return
         raise ConnectionError("Could not execute scene")
     
-    async def turn_on_light_bulb(
+    async def light_bulb(
         self,
         session: ClientSession,
         device: str,
         brightness: int = 100,
         colour: str = "255:255:204",
     ) -> None:
-        """Turn every a specefic lightbulb on (to brightness and colour).
+        """Turn on a light bulb.
 
         Parameters:
             session: An aiohttp session to be used for all the switchbot requests
@@ -186,12 +186,12 @@ class SwitchBotController:
 
             await asyncio.sleep(5)
 
-    async def turn_on_socket(
+    async def activate_socket(
         self,
         session: ClientSession,
         device: str,
     ) -> None:
-        """Turn every a specefic lightbulb on (to brightness and colour).
+        """Turn on a socket.
 
         Parameters:
             session: An aiohttp session to be used for all the switchbot requests
@@ -204,6 +204,20 @@ class SwitchBotController:
 
             await self.command(session, device, {"command": "turnOn", "commandType": "command"})
             await asyncio.sleep(5)
+
+    async def press_bot(
+            controller: SwitchBotController,
+            session: ClientSession,
+            device: str
+        ) -> None:
+        """Press a bot.
+
+        Parameters:
+            session: An aiohttp session to be used for all the switchbot requests
+            device: The device ID
+        """
+        await controller.command(session, device, {"command": "press", "commandType": "command"})
+        await asyncio.sleep(5)
 
     async def open_curtain(
         self,

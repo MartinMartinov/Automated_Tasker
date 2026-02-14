@@ -72,22 +72,22 @@ class SetAlarm:
                     async with ClientSession() as session:
                         await controller.refresh(session)
                         try:
-                            await controller.press_bot(controller, session, "Nespresso")
-                            asyncio.sleep(30)
-                            await controller.press_bot(controller, session, "Nespresso")
+                            await controller.press_bot(session, "Nespresso")
+                            await asyncio.sleep(30)
+                            await controller.press_bot(session, "Nespresso")
                         except ConnectionError:
                             pass
-                        asyncio.sleep(60*10)
+                        await asyncio.sleep(60*10)
                         await controller.refresh(session)
                         await asyncio.gather(
                             controller.open_curtain(session, "Curtain"),
-                            controller.turn_on_light_bulb(session, "Left Bulb"),
-                            controller.turn_on_light_bulb(session, "Right Bulb"),
+                            controller.light_bulb(session, "Left Bulb"),
+                            controller.light_bulb(session, "Right Bulb"),
                             return_exceptions=True,
                         )
-                        asyncio.sleep(60*5)
+                        await asyncio.sleep(60*5)
                         try:
-                            await controller.open_curtain(session, "Alarm Light")
+                            await controller.activate_socket(session, "Alarm Light")
                         except ConnectionError:
                             pass
 
