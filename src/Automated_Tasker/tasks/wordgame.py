@@ -68,7 +68,6 @@ class MorningWordGame:
         Parameters:
             vault (Vault | None): The vault with the pushbullet token and Google Calendar creds
         """
-        calendar = GoogleCalendarClient(vault)
         notifier = PushbulletNotifier(vault.load_entries()["pushbullet-key"])
         notifier.send_notification("Yesterday's Words", "\n".join(get_words(datetime.now()-timedelta(hours=24))))
 
@@ -87,6 +86,5 @@ class NightWordGame:
         Parameters:
             vault (Vault | None): The vault with the pushbullet token and Google Calendar creds
         """
-        calendar = GoogleCalendarClient(vault)
         notifier = PushbulletNotifier(vault.load_entries()["pushbullet-key"])
-        notifier.send_notification("Today's Words", "\n".join(get_words()))
+        notifier.send_notification("Today's Words", "\n".join(get_words(datetime.now())))

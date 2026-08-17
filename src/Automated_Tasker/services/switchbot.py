@@ -32,24 +32,28 @@ class SwitchBotController:
             token: The token given for a SwitchBot account
             secret: The secret given for a SwitchBot account
         """
-        nonce = uuid.uuid4()
-        t = int(round(time.time() * 1000))
-        string_to_sign = "{}{}{}".format(token, t, nonce)
-
-        string_to_sign = bytes(string_to_sign, "utf-8")
-        secret = bytes(secret, "utf-8")
-
-        sign = base64.b64encode(hmac.new(secret, msg=string_to_sign, digestmod=hashlib.sha256).digest())
-
-        self.headers = {
-            "Authorization": token,
-            "Content-Type": "application/json; charset=utf8",
-            "t": str(t),
-            "sign": str(sign, "utf-8"),
-            "nonce": str(nonce),
-        }
+        self.token = token
+        self.secret = secret
         self.devices = {}
         self.scenes = {}
+    
+    def _get_headers(self) -> dict[str, str]:
+        nonce = uuid.uuid4()
+        t = str(int(round(time.time() * 1000)))
+        string_to_sign = f"{self.token}{t}{nonce}".encode("utf-8")
+        secret_bytes = self.secret.encode("utf-8")
+
+        sign = base64.b64encode(
+            hmac.new(secret_bytes, msg=string_to_sign, digestmod=hashlib.sha256).digest()
+        ).decode("utf-8")
+
+        return {
+            "Authorization": self.token,
+            "Content-Type": "application/json; charset=utf8",
+            "t": t,
+            "sign": sign,
+            "nonce": str(nonce),
+        }
 
     async def refresh(self, session: ClientSession) -> None:
         """Fetch all lists to populate the class.
@@ -73,7 +77,7 @@ class SwitchBotController:
             ConnectionError: Raised if only bad responses are received after NUM_RETRIES attemps
         """
         for _ in range(NUM_RETRIES):
-            async with session.get(f"{URL}v1.1/devices", headers=self.headers) as response:
+            async with session.get(f"{URL}v1.1/devices", headers=self._get_headers()) as response:
                 if not response.ok:
                     await asyncio.sleep(WAIT_RETRIES)
                     continue
@@ -92,7 +96,7 @@ class SwitchBotController:
             ConnectionError: Raised if only bad responses are received after NUM_RETRIES attemps
         """
         for _ in range(NUM_RETRIES):
-            async with session.get(f"{URL}v1.1/scenes", headers=self.headers) as response:
+            async with session.get(f"{URL}v1.1/scenes", headers=self._get_headers()) as response:
                 if not response.ok:
                     await asyncio.sleep(WAIT_RETRIES)
                     continue
@@ -114,7 +118,7 @@ class SwitchBotController:
         """
         for _ in range(NUM_RETRIES):
             async with session.post(
-                f"{URL}v1.1/devices/{self.devices[device]}/commands", headers=self.headers, json=payload
+                f"{URL}v1.1/devices/{self.devices[device]}/commands", headers=self._get_headers(), json=payload
             ) as response:
                 if not response.ok:
                     await asyncio.sleep(WAIT_RETRIES)
@@ -133,7 +137,7 @@ class SwitchBotController:
             ConnectionError: Raised if only bad responses are received after NUM_RETRIES attemps
         """
         for _ in range(NUM_RETRIES):
-            async with session.get(f"{URL}v1.1/devices/{self.devices[device]}/status", headers=self.headers) as response:
+            async with session.get(f"{URL}v1.1/devices/{self.devices[device]}/status", headers=self._get_headers()) as response:
                 if not response.ok:
                     await asyncio.sleep(WAIT_RETRIES)
                     continue
@@ -148,7 +152,7 @@ class SwitchBotController:
             scene: The scene pulled from the scenes dict to execute
         """
         for _ in range(NUM_RETRIES):
-            async with session.get(f"{URL}v1.1/scenes/{self.scenes[scene]}/execute", headers=self.headers) as response:
+            async with session.get(f"{URL}v1.1/scenes/{self.scenes[scene]}/execute", headers=self._get_headers()) as response:
                 if not response.ok:
                     await asyncio.sleep(WAIT_RETRIES)
                     continue
@@ -174,7 +178,7 @@ class SwitchBotController:
             ("power", "on", "turnOn", "default"), 
             ("brightness", brightness, "setBrightness", brightness), 
             ("color", colour, "setColor", colour),
-         ]
+        ]
         for _ in range(0, 10):
             status = await self.status(session, device)
             if all(status[key] == value for key, value, _, _ in tasks):
@@ -206,7 +210,7 @@ class SwitchBotController:
             await asyncio.sleep(5)
 
     async def press_bot(
-            controller: SwitchBotController,
+            self,
             session: ClientSession,
             device: str
         ) -> None:
@@ -216,7 +220,7 @@ class SwitchBotController:
             session: An aiohttp session to be used for all the switchbot requests
             device: The device ID
         """
-        await controller.command(session, device, {"command": "press", "commandType": "command"})
+        await self.command(session, device, {"command": "press", "commandType": "command"})
         await asyncio.sleep(5)
 
     async def open_curtain(

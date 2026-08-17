@@ -15,7 +15,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 CHECK_PERIOD = timedelta(minutes=30)
-ALERT_PERIOD = timedelta(hours=24)
+ALERT_PERIOD = timedelta(hours=36)
 
 @Subdaemons.register
 class CheckLitterBox:

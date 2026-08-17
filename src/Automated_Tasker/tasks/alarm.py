@@ -77,7 +77,8 @@ class SetAlarm:
                             await controller.press_bot(session, "Nespresso")
                         except ConnectionError:
                             pass
-                        await asyncio.sleep(60*10)
+                    await asyncio.sleep(60*10)
+                    async with ClientSession() as session:
                         await controller.refresh(session)
                         await asyncio.gather(
                             controller.open_curtain(session, "Curtain"),
