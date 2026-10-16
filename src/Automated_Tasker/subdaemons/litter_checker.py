@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 CHECK_PERIOD = timedelta(minutes=30)
 ALERT_PERIOD = timedelta(hours=36)
 
-@Subdaemons.register
+#@Subdaemons.register
 class CheckLitterBox:
     """A deamon that checks the regular use of the litter box."""
 
